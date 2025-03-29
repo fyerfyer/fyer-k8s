@@ -1,0 +1,134 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: fyerfyer
+  BACKEND_IMAGE_NAME: k8s-app
+  FRONTEND_IMAGE_NAME: vue-frontend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up image versioning
+        id: version
+        run: |
+          # For tags - use the tag name (e.g., v1.2.3)
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          # For master/main - use short SHA
+          elif [[ $GITHUB_REF == refs/heads/main || $GITHUB_REF == refs/heads/master ]]; then
+            VERSION=latest
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            SHA_VERSION=$SHORT_SHA
+          # For PRs - use PR number and short SHA
+          elif [[ $GITHUB_REF == refs/pull/* ]]; then
+            PR_NUMBER=$(echo $GITHUB_REF | awk 'BEGIN { FS = "/" } ; { print $3 }')
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            VERSION=pr-$PR_NUMBER
+            SHA_VERSION=$SHORT_SHA
+          # For other branches - use branch name and short SHA
+          else
+            BRANCH=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's/[\/]/-/g')
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            VERSION=$BRANCH
+            SHA_VERSION=$SHORT_SHA
+          fi
+          
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "SHA_VERSION=$SHA_VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "SHA_VERSION=$SHA_VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION and SHA: $SHA_VERSION"
+
+      # Setup Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Login to registry
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build and push backend image
+      - name: Build and push backend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./k8s
+          file: ./k8s/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.BACKEND_IMAGE_NAME }}:${{ env.VERSION }}
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.BACKEND_IMAGE_NAME }}:sha-${{ env.SHA_VERSION }}
+
+      # Build and push frontend image
+      - name: Build and push frontend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ env.VERSION }}
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.FRONTEND_IMAGE_NAME }}:sha-${{ env.SHA_VERSION }}
+
+      # Create deployment manifest with updated image tags
+      - name: Generate deployment manifest
+        run: |
+          sed -e "s|ghcr.io/fyerfyer/k8s-app:latest|${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.BACKEND_IMAGE_NAME }}:${{ env.VERSION }}|g" \
+              -e "s|ghcr.io/fyerfyer/vue-frontend:latest|${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ env.VERSION }}|g" \
+              docker-compose.yml > docker-compose.deploy.yml
+          cat docker-compose.deploy.yml
+
+      # Upload artifacts for deployment
+      - name: Upload deployment artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-files
+          path: |
+            docker-compose.deploy.yml
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'  # Only deploy on direct pushes, not PRs
+    
+    steps:
+      - name: Download deployment artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: deployment-files
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Setup known hosts
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_HOST_KEY }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        run: |
+          scp docker-compose.deploy.yml ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:~/docker-compose.yml
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "cd ~/ && docker-compose pull && docker-compose up -d"

@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # 后端服务
   backend:
-    image: refactored-disco-5gvqjqq564p9f55x-443.app.github.dev/fyer-cluster/k8s-app:v1.0
+    image: ghcr.io/fyerfyer/k8s-app:latest
     container_name: k8s-backend
     restart: unless-stopped
     ports:
@@ -26,11 +26,11 @@ services:
 
   # 前端服务
   frontend:
-    image: refactored-disco-5gvqjqq564p9f55x-443.app.github.dev/fyer-cluster/vue-frontend:v1.0
+    image: ghcr.io/fyerfyer/vue-frontend:latest
     container_name: k8s-frontend
     restart: unless-stopped
+    # 为防止端口重复，将80端口映射到8080端口
     ports:
-      # 将端口映射从80改为8080，避免冲突
       - "8080:80"
     depends_on:
       - backend
