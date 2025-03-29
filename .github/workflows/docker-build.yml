@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4  # Updated from v3 to v4
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -91,45 +91,22 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ env.VERSION }}
             ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.FRONTEND_IMAGE_NAME }}:sha-${{ env.SHA_VERSION }}
 
-      # Create deployment manifest with updated image tags
+      # Create and upload a deployment file for reference (optional)
       - name: Generate deployment manifest
         run: |
           sed -e "s|ghcr.io/fyerfyer/k8s-app:latest|${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.BACKEND_IMAGE_NAME }}:${{ env.VERSION }}|g" \
               -e "s|ghcr.io/fyerfyer/vue-frontend:latest|${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ env.VERSION }}|g" \
               docker-compose.yml > docker-compose.deploy.yml
-          cat docker-compose.deploy.yml
+          echo "# Deployment Instructions" > DEPLOYMENT.md
+          echo "Run the following command to deploy the latest version:" >> DEPLOYMENT.md
+          echo "\`\`\`bash" >> DEPLOYMENT.md
+          echo "./local_deployment.sh ${{ env.VERSION }}" >> DEPLOYMENT.md
+          echo "\`\`\`" >> DEPLOYMENT.md
 
-      # Upload artifacts for deployment - UPDATED TO V4
       - name: Upload deployment artifacts
         uses: actions/upload-artifact@v4
         with:
           name: deployment-files
           path: |
             docker-compose.deploy.yml
-
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'  # Only deploy on direct pushes, not PRs
-    
-    steps:
-      # UPDATED TO V4
-      - name: Download deployment artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: deployment-files
-
-      - name: Set up SSH
-        uses: webfactory/ssh-agent@v0.7.0
-        with:
-          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
-
-      - name: Setup known hosts
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_HOST_KEY }}" >> ~/.ssh/known_hosts
-
-      - name: Deploy to server
-        run: |
-          scp docker-compose.deploy.yml ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:~/docker-compose.yml
-          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "cd ~/ && docker-compose pull && docker-compose up -d"
+            DEPLOYMENT.md
