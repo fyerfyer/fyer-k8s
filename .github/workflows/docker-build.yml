@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  # Updated from v3 to v4
         with:
           fetch-depth: 0
 
@@ -99,9 +99,9 @@ jobs:
               docker-compose.yml > docker-compose.deploy.yml
           cat docker-compose.deploy.yml
 
-      # Upload artifacts for deployment
+      # Upload artifacts for deployment - UPDATED TO V4
       - name: Upload deployment artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: deployment-files
           path: |
@@ -113,8 +113,9 @@ jobs:
     if: github.event_name != 'pull_request'  # Only deploy on direct pushes, not PRs
     
     steps:
+      # UPDATED TO V4
       - name: Download deployment artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: deployment-files
 
