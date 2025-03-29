@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # 后端服务
+  backend:
+    image: refactored-disco-5gvqjqq564p9f55x-443.app.github.dev/fyer-cluster/k8s-app:v1.0
+    container_name: k8s-backend
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - TZ=Asia/Shanghai
+    networks:
+      - k8s-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # 前端服务
+  frontend:
+    image: refactored-disco-5gvqjqq564p9f55x-443.app.github.dev/fyer-cluster/vue-frontend:v1.0
+    container_name: k8s-frontend
+    restart: unless-stopped
+    ports:
+      # 将端口映射从80改为8080，避免冲突
+      - "8080:80"
+    depends_on:
+      - backend
+    environment:
+      - TZ=Asia/Shanghai
+    networks:
+      - k8s-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 128M
+
+networks:
+  k8s-network:
+    driver: bridge
