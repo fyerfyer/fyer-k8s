@@ -1,6 +1,7 @@
 <template>
     <div class="pods-view">
-        <pod-list />
+        <router-view v-if="$route.params.name" />
+        <pod-list v-else />
     </div>
 </template>
 

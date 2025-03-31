@@ -3,6 +3,22 @@
         <div class="table-header">
             <h2>Kubernetes Pods</h2>
             <div class="table-actions">
+                <!-- Namespace Selector -->
+                <el-select 
+                    v-model="selectedNamespace" 
+                    placeholder="Select Namespace" 
+                    size="small"
+                    @change="fetchPods"
+                >
+                    <el-option label="All Namespaces" value="" />
+                    <el-option 
+                        v-for="ns in namespaces" 
+                        :key="ns" 
+                        :label="ns" 
+                        :value="ns" 
+                    />
+                </el-select>
+                
                 <el-button type="primary" @click="fetchPods" :loading="loading" size="small">
                     <el-icon>
                         <refresh />
@@ -22,9 +38,21 @@
                     </el-tag>
                 </template>
             </el-table-column>
-            <el-table-column label="Actions" width="180">
+            <el-table-column prop="podIP" label="Pod IP" min-width="120" />
+            <el-table-column prop="nodeName" label="Node" min-width="150" />
+            <el-table-column label="Created" min-width="180">
                 <template #default="scope">
-                    <el-button type="primary" size="small" @click="viewPodDetails(scope.row)">
+                    {{ formatDate(scope.row.creationTime) }}
+                </template>
+            </el-table-column>
+            <el-table-column label="Actions" width="120" fixed="right">
+                <template #default="scope">
+                    <el-button 
+                        type="primary" 
+                        size="small" 
+                        @click="viewPodDetails(scope.row)"
+                        :disabled="loading"
+                    >
                         View
                     </el-button>
                 </template>
@@ -34,10 +62,11 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import kubernetesApi from '@/api/kubernetes'
+import { useRouter } from 'vue-router'
 
 export default {
     name: 'PodList',
@@ -47,58 +76,78 @@ export default {
     setup() {
         const pods = ref([])
         const loading = ref(false)
+        const selectedNamespace = ref('')
+        const namespaces = ref(['default', 'kube-system', 'kube-public'])
+        const router = useRouter()
 
+        // Fetch the list of Pods
         const fetchPods = async () => {
             loading.value = true
             try {
-                const response = await kubernetesApi.listPods()
-                // Mocking pod data since the API currently only returns a message
-                // In the future, you'll parse the actual pod data from the API response
-                pods.value = [
-                    { name: 'nginx-pod', namespace: 'default', status: 'Running' },
-                    { name: 'redis-pod', namespace: 'kube-system', status: 'Pending' },
-                    { name: 'mongodb-pod', namespace: 'database', status: 'Failed' }
-                ]
-                ElMessage({
-                    type: 'success',
-                    message: response.message || 'Pods loaded successfully',
-                    duration: 2000
-                })
+                const response = await kubernetesApi.listPods(selectedNamespace.value)
+                if (response && response.pods) {
+                    pods.value = response.pods
+                    
+                    // Extract unique namespace list
+                    const uniqueNamespaces = [...new Set(response.pods.map(pod => pod.namespace))]
+                    if (uniqueNamespaces.length > 0) {
+                        namespaces.value = uniqueNamespaces
+                    }
+                    
+                    ElMessage({
+                        type: 'success',
+                        message: `Loaded ${response.pods.length} pods`,
+                        duration: 2000
+                    })
+                } else {
+                    ElMessage.warning('No pods data received')
+                }
             } catch (error) {
-                ElMessage.error('Failed to fetch pods')
-                console.error(error)
+                console.error('Failed to fetch pods:', error)
+                ElMessage.error(`Failed to fetch pods: ${error.message || 'Unknown error'}`)
             } finally {
                 loading.value = false
             }
         }
 
+        // View Pod details
         const viewPodDetails = (pod) => {
-            ElMessage({
-                message: `Viewing details for pod: ${pod.name}`,
-                type: 'info'
-            })
-            // Future implementation would navigate to a pod details page
+            router.push(`/pods/${pod.namespace}/${pod.name}`)
         }
 
+        // Return different tag types based on Pod status
         const getPodStatusType = (status) => {
             const types = {
                 'Running': 'success',
                 'Pending': 'warning',
                 'Failed': 'danger',
-                'Succeeded': 'info'
+                'Succeeded': 'info',
+                'Unknown': 'info'
             }
             return types[status] || 'info'
         }
 
-        // Fetch pods on component mount
-        fetchPods()
+        // Format date
+        const formatDate = (dateString) => {
+            if (!dateString) return '-'
+            const date = new Date(dateString)
+            return date.toLocaleString()
+        }
+
+        // Load data when the component is mounted
+        onMounted(() => {
+            fetchPods()
+        })
 
         return {
             pods,
             loading,
+            selectedNamespace,
+            namespaces,
             fetchPods,
             viewPodDetails,
-            getPodStatusType
+            getPodStatusType,
+            formatDate
         }
     }
 }
@@ -107,6 +156,9 @@ export default {
 <style scoped>
 .pod-list {
     padding: 20px;
+    background-color: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
 .table-header {
@@ -119,5 +171,6 @@ export default {
 .table-actions {
     display: flex;
     gap: 10px;
+    align-items: center;
 }
 </style>
