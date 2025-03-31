@@ -5,6 +5,12 @@ GITHUB_USER="fyerfyer"  # docker-compose.yml中使用的用户名
 VERSION="latest"  # 默认使用最新版本
 
 # 检查参数
+if [ "$1" == "down" ]; then
+    echo "停止并移除容器..."
+    docker-compose down
+    exit 0
+fi
+
 if [ "$1" != "" ]; then
     VERSION="$1"
     echo "使用指定版本: $VERSION"
@@ -38,6 +44,4 @@ docker-compose -f docker-compose.local.yml up -d
 echo "部署完成！应用正在运行:"
 echo "- 前端: http://localhost:8080"
 echo "- 后端: http://localhost:8081"
-
-# 清理临时文件
-rm docker-compose.local.yml
+echo "容器已启动！使用 './local_deployment.sh down' 来停止它们"
