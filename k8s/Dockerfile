@@ -16,25 +16,18 @@ COPY . .
 # 构建可执行文件，添加一些优化选项来减小二进制文件大小
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /app/k8s-app ./cmd
 
-# 使用scratch作为最终基础镜像，这是一个空镜像
-FROM scratch
+# 在builder阶段创建Kubernetes配置目录
+RUN mkdir -p /root/.kube
 
-# 复制证书，确保HTTPS请求能够工作
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+FROM gcr.io/distroless/static-debian11
 
-# 创建工作目录
-WORKDIR /app
+# 复制二进制文件和必要的配置
+COPY --from=builder /app/k8s-app /app/
+COPY --from=builder /app/internal/config/config.yaml /app/internal/config/
+# 复制预先创建的目录
+COPY --from=builder /root/.kube /root/.kube
 
-# 仅复制编译好的二进制文件和必要的配置
-COPY --from=builder /app/k8s-app .
-COPY --from=builder /app/internal/config/config.yaml ./internal/config/
-
-# 创建Kubernetes配置目录
-WORKDIR /app/.kube
-
-# 复制 kubernetes 配置文件
-COPY --from=builder /app/.kube .
-
+# 工作目录
 WORKDIR /app
 
 # 暴露服务端口

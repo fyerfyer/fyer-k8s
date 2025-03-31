@@ -10,6 +10,11 @@ services:
       - "8081:8081"
     environment:
       - TZ=Asia/Shanghai
+      # 可以通过环境变量指定KUBECONFIG路径
+      - KUBECONFIG=/root/.kube/config
+    volumes:
+      # 挂载本地kubeconfig到容器内
+      - ${HOME}/.kube:/root/.kube:ro
     networks:
       - k8s-network
     healthcheck:

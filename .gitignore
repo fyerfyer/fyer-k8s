@@ -31,3 +31,6 @@ docker-compose.local.yml
 
 /node_modules
 /node_modules/
+
+kubectl
+kubectl.sha256

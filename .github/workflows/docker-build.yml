@@ -12,6 +12,7 @@ env:
   OWNER: fyerfyer
   BACKEND_IMAGE_NAME: k8s-app
   FRONTEND_IMAGE_NAME: vue-frontend
+  KUBECONFIG_MOUNT: ${HOME}/.kube:/root/.kube:ro
 
 jobs:
   build-and-push:
