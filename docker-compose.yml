@@ -41,6 +41,7 @@ services:
       - backend
     environment:
       - TZ=Asia/Shanghai
+      - VUE_APP_API_DEBUG=true
     networks:
       - k8s-network
     healthcheck:
