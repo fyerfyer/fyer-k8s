@@ -12,9 +12,11 @@ services:
       - TZ=Asia/Shanghai
       # 可以通过环境变量指定KUBECONFIG路径
       - KUBECONFIG=/root/.kube/config
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # 挂载本地kubeconfig到容器内
-      - ${HOME}/.kube:/root/.kube:ro
+      - ${HOME}/.kube/config.docker:/root/.kube/config:ro
     networks:
       - k8s-network
     healthcheck:

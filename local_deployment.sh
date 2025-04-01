@@ -34,6 +34,10 @@ if [ "$VERSION" != "latest" ]; then
     echo "版本已更新为: $VERSION"
 fi
 
+# 确保添加host.docker.internal配置
+echo "添加host.docker.internal配置..."
+sed -i '/backend:/,/networks:/s/networks:/extra_hosts:\n      - "host.docker.internal:host-gateway"\n    networks:/' docker-compose.local.yml
+
 # 拉取和启动容器
 echo "拉取最新镜像..."
 docker-compose -f docker-compose.local.yml pull
