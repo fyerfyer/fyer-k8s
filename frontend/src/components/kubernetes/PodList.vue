@@ -55,7 +55,7 @@
                     {{ formatDate(scope.row.creationTime) }}
                 </template>
             </el-table-column>
-            <el-table-column label="Actions" width="120" fixed="right">
+            <el-table-column label="Actions" width="200" fixed="right">
                 <template #default="scope">
                     <el-button 
                         type="primary" 
@@ -64,6 +64,14 @@
                         :disabled="loading"
                     >
                         View
+                    </el-button>
+                    <el-button 
+                        type="danger" 
+                        size="small" 
+                        @click="confirmDeletePod(scope.row)"
+                        :disabled="loading"
+                    >
+                        Delete
                     </el-button>
                 </template>
             </el-table-column>
@@ -82,6 +90,21 @@
                 @created="handlePodCreated"
                 @cancel="createPodDialogVisible = false"
             />
+        </el-dialog>
+
+        <!-- Delete Pod Confirmation Dialog -->
+        <el-dialog
+            v-model="deleteDialogVisible"
+            title="Delete Pod"
+            width="30%"
+        >
+            <span>Are you sure you want to delete pod "{{ podToDelete.name }}" in namespace "{{ podToDelete.namespace }}"?</span>
+            <template #footer>
+                <span class="dialog-footer">
+                    <el-button @click="deleteDialogVisible = false">Cancel</el-button>
+                    <el-button type="danger" @click="deletePod" :loading="deleting">Delete</el-button>
+                </span>
+            </template>
         </el-dialog>
     </div>
 </template>
@@ -110,6 +133,11 @@ export default {
         
         // Create Pod Dialog
         const createPodDialogVisible = ref(false)
+        
+        // Delete Pod Dialog
+        const deleteDialogVisible = ref(false)
+        const deleting = ref(false)
+        const podToDelete = ref({})
 
         // Fetch the list of Pods
         const fetchPods = async () => {
@@ -150,6 +178,33 @@ export default {
         const handlePodCreated = () => {
             createPodDialogVisible.value = false
             fetchPods() // Refresh the pod list
+        }
+
+        // Show delete confirmation dialog
+        const confirmDeletePod = (pod) => {
+            podToDelete.value = pod
+            deleteDialogVisible.value = true
+        }
+
+        // Delete pod
+        const deletePod = async () => {
+            if (!podToDelete.value.name || !podToDelete.value.namespace) {
+                ElMessage.warning('Invalid pod information')
+                return
+            }
+
+            deleting.value = true
+            try {
+                await kubernetesApi.deletePod(podToDelete.value.namespace, podToDelete.value.name)
+                ElMessage.success(`Pod "${podToDelete.value.name}" deleted successfully`)
+                deleteDialogVisible.value = false
+                fetchPods() // Refresh the pod list
+            } catch (error) {
+                console.error('Failed to delete pod:', error)
+                ElMessage.error(`Failed to delete pod: ${error.message || 'Unknown error'}`)
+            } finally {
+                deleting.value = false
+            }
         }
 
         // View Pod details
@@ -193,7 +248,13 @@ export default {
             // Create Pod
             createPodDialogVisible,
             showCreatePodDialog,
-            handlePodCreated
+            handlePodCreated,
+            // Delete Pod
+            deleteDialogVisible,
+            deleting,
+            podToDelete,
+            confirmDeletePod,
+            deletePod
         }
     }
 }

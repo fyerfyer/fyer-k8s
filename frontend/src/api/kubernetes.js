@@ -45,6 +45,16 @@ const kubernetesApi = {
       namespace: namespace
     };
     return apiClient.post('/api/v1/pods', payload);
+  },
+  
+  /**
+   * Delete a pod from the Kubernetes cluster
+   * @param {string} namespace - Pod namespace
+   * @param {string} name - Pod name
+   * @returns {Promise<Object>} The API response
+   */
+  deletePod(namespace, name) {
+    return apiClient.delete(`/api/v1/pods/${namespace}/${name}`);
   }
 };
 
