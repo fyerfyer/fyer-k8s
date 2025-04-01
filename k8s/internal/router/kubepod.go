@@ -17,5 +17,11 @@ func setupPodAPIRoutes(r *gin.Engine) {
         
         // 获取Pod详情
         podGroup.GET("/:namespace/:name", podHandler.GetPodDetail)
+
+        // 删除Pod
+        podGroup.DELETE("/:namespace/:name", podHandler.DeletePod)
+
+        // 创建Pod
+        podGroup.POST("", podHandler.CreatePod)
     }
 }

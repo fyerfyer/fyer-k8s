@@ -13,6 +13,8 @@ import (
 type PodService interface {
     ListPods(ctx context.Context, namespace string) (*models.PodListResponse, error)
     GetPodDetail(ctx context.Context, namespace, name string) (*models.PodInfo, error)
+    DeletePod(ctx context.Context, namespace, name string) error
+    CreatePod(ctx context.Context, podRequest *models.PodCreateRequest) (*models.PodInfo, error)
 }
 
 type podService struct {
@@ -104,4 +106,71 @@ func convertPodToInfo(pod *corev1.Pod) models.PodInfo {
     }
 
     return podInfo
+}
+
+// DeletePod 删除指定的Pod
+func (ps *podService) DeletePod(ctx context.Context, namespace, name string) error {
+    deleteOptions := metav1.DeleteOptions{}
+    return ps.kubeClientSet.CoreV1().Pods(namespace).Delete(ctx, name, deleteOptions)
+}
+
+// CreatePod 创建一个新的Pod
+func (ps *podService) CreatePod(ctx context.Context, podRequest *models.PodCreateRequest) (*models.PodInfo, error) {
+    // 创建容器列表
+    containers := make([]corev1.Container, 0, len(podRequest.Containers))
+    for _, c := range podRequest.Containers {
+        container := corev1.Container{
+            Name:  c.Name,
+            Image: c.Image,
+        }
+        
+        // 处理容器端口
+        if len(c.Ports) > 0 {
+            containerPorts := make([]corev1.ContainerPort, 0, len(c.Ports))
+            for _, port := range c.Ports {
+                containerPorts = append(containerPorts, corev1.ContainerPort{
+                    Name:          port.Name,
+                    ContainerPort: port.ContainerPort,
+                    Protocol:      corev1.Protocol(port.Protocol),
+                })
+            }
+            container.Ports = containerPorts
+        }
+        
+        // 处理环境变量
+        if len(c.Env) > 0 {
+            envVars := make([]corev1.EnvVar, 0, len(c.Env))
+            for k, v := range c.Env {
+                envVars = append(envVars, corev1.EnvVar{
+                    Name:  k,
+                    Value: v,
+                })
+            }
+            container.Env = envVars
+        }
+        
+        containers = append(containers, container)
+    }
+    
+    // 创建Pod对象
+    pod := &corev1.Pod{
+        ObjectMeta: metav1.ObjectMeta{
+            Name:      podRequest.Name,
+            Namespace: podRequest.Namespace,
+            Labels:    podRequest.Labels,
+        },
+        Spec: corev1.PodSpec{
+            Containers: containers,
+        },
+    }
+    
+    // 调用Kubernetes API创建Pod
+    createdPod, err := ps.kubeClientSet.CoreV1().Pods(podRequest.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+    if err != nil {
+        return nil, err
+    }
+    
+    // 将创建的Pod转换为响应对象
+    podInfo := convertPodToInfo(createdPod)
+    return &podInfo, nil
 }

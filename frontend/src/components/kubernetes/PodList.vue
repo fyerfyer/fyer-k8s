@@ -3,6 +3,16 @@
         <div class="table-header">
             <h2>Kubernetes Pods</h2>
             <div class="table-actions">
+                <!-- Create Pod Button -->
+                <el-button 
+                    type="primary" 
+                    @click="showCreatePodDialog" 
+                    size="small"
+                >
+                    <el-icon><plus /></el-icon>
+                    Create Pod
+                </el-button>
+
                 <!-- Namespace Selector -->
                 <el-select 
                     v-model="selectedNamespace" 
@@ -58,20 +68,38 @@
                 </template>
             </el-table-column>
         </el-table>
+
+        <!-- Create Pod Dialog with CreatePodForm Component -->
+        <el-dialog
+            v-model="createPodDialogVisible"
+            title="Create Pod"
+            width="60%"
+            :close-on-click-modal="false"
+        >
+            <create-pod-form 
+                :namespaces="namespaces" 
+                :initialNamespace="selectedNamespace || 'default'"
+                @created="handlePodCreated"
+                @cancel="createPodDialogVisible = false"
+            />
+        </el-dialog>
     </div>
 </template>
 
 <script>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Refresh } from '@element-plus/icons-vue'
+import { Refresh, Plus } from '@element-plus/icons-vue'
 import kubernetesApi from '@/api/kubernetes'
 import { useRouter } from 'vue-router'
+import CreatePodForm from '@/components/kubernetes/CreatePodForm.vue'
 
 export default {
     name: 'PodList',
     components: {
-        Refresh
+        Refresh,
+        Plus,
+        CreatePodForm
     },
     setup() {
         const pods = ref([])
@@ -79,6 +107,9 @@ export default {
         const selectedNamespace = ref('')
         const namespaces = ref(['default', 'kube-system', 'kube-public'])
         const router = useRouter()
+        
+        // Create Pod Dialog
+        const createPodDialogVisible = ref(false)
 
         // Fetch the list of Pods
         const fetchPods = async () => {
@@ -108,6 +139,17 @@ export default {
             } finally {
                 loading.value = false
             }
+        }
+
+        // Show create pod dialog
+        const showCreatePodDialog = () => {
+            createPodDialogVisible.value = true
+        }
+
+        // Handle pod created event from CreatePodForm
+        const handlePodCreated = () => {
+            createPodDialogVisible.value = false
+            fetchPods() // Refresh the pod list
         }
 
         // View Pod details
@@ -147,7 +189,11 @@ export default {
             fetchPods,
             viewPodDetails,
             getPodStatusType,
-            formatDate
+            formatDate,
+            // Create Pod
+            createPodDialogVisible,
+            showCreatePodDialog,
+            handlePodCreated
         }
     }
 }

@@ -30,3 +30,26 @@ type PodListResponse struct {
     Pods  []PodInfo `json:"pods"`
     Total int       `json:"total"`
 }
+
+// PodCreateRequest 定义了创建Pod的请求结构
+type PodCreateRequest struct {
+    Name       string                 `json:"name" binding:"required"`
+    Namespace  string                 `json:"namespace" binding:"required"`
+    Labels     map[string]string      `json:"labels,omitempty"`
+    Containers []ContainerCreateSpec  `json:"containers" binding:"required,min=1"`
+}
+
+// ContainerCreateSpec 定义了创建容器的规格
+type ContainerCreateSpec struct {
+    Name     string             `json:"name" binding:"required"`
+    Image    string             `json:"image" binding:"required"`
+    Ports    []ContainerPort    `json:"ports,omitempty"`
+    Env      map[string]string  `json:"env,omitempty"`
+}
+
+// ContainerPort 定义了容器端口配置
+type ContainerPort struct {
+    Name          string `json:"name,omitempty"`
+    ContainerPort int32  `json:"containerPort" binding:"required"`
+    Protocol      string `json:"protocol,omitempty"` // 默认为TCP，可选值：TCP, UDP, SCTP
+}
